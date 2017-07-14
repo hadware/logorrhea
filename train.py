@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
             if epoch % args.print_every == 0:
                 print('[%s (%d %d%%) %.4f]' % (time_since(start), epoch, epoch / args.n_epochs * 100))
-                print(generate(decoder, 'Wh', 100), '\n')
+                print(model.generate(['l'], 100), '\n')
 
         print("Saving...")
         model.save()

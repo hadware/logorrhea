@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from .helper import Synthesizer
+import pickle
+import os
 
 class RNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, n_layers=1):
@@ -33,6 +35,7 @@ class Model:
         self.optim = optimizer
         self.crit = criterion
         self.synth = synthesizer
+        self.model_save_filename = None # type:str
 
     def train(self, input_tensor : torch.LongTensor, target_tensor : torch.LongTensor):
         hidden = self.decoder.init_hidden()
@@ -73,5 +76,22 @@ class Model:
 
         return predicted
 
-    def save(self):
-        pass
+    def save(self, filename):
+        basename = os.path.splitext(os.path.basename(filename))[0]
+        self.model_save_filename = basename + '.pt'
+        torch.save(self.decoder, self.model_save_filename)
+        with open(basename + ".pckl", "wb") as picklefile:
+            # to prevent the decoder from being pickled "vanilla-style", deleting it from the object's field
+            # before pickling, then re-adding it
+            decoder = self.decoder
+            del self.decoder
+            pickle.dump(self, picklefile)
+            self.decoder = decoder
+        print('Saved as %s' % self.model_save_filename)
+
+    @classmethod
+    def load(cls, filename):
+        with open(filename, "rb") as pickledfile:
+            instance = pickle.load(pickledfile)
+            instance.decoder = torch.load(instance.model_save_filename)
+        return instance
