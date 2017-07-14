@@ -4,7 +4,7 @@ import time
 import torch
 from torch import nn
 from tools.model import RNN, Model
-from tools.helper import CorpusManager
+from tools.helper import CorpusManager, time_since
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument('filename', type=str)
@@ -40,8 +40,8 @@ if __name__ == "__main__":
                 print(model.generate(['l'], 100), '\n')
 
         print("Saving...")
-        model.save()
+        model.save(args.filename)
 
     except KeyboardInterrupt:
         print("Saving before quit...")
-        model.save()
+        model.save(args.filename)

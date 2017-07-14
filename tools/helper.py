@@ -1,13 +1,22 @@
-from voxpopuli import PhonemeList, Voice
-from voxpopuli.phonemes import Phoneme
-import torch
 import logging
-from progressbar import ProgressBar
-from bidict import bidict
+import math
 import random
-from typing import List, Dict
-from torch.autograd import Variable
+import time
+from typing import List
 
+import torch
+from bidict import bidict
+from progressbar import ProgressBar
+from torch.autograd import Variable
+from voxpopuli import Voice
+from voxpopuli.phonemes import Phoneme
+
+
+def time_since(since):
+    s = time.time() - since
+    m = math.floor(s / 60)
+    s -= m * 60
+    return '%dm %ds' % (m, s)
 
 class Synthesizer:
 
