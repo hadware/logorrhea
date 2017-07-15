@@ -19,7 +19,7 @@ argparser.add_argument('--chunk_len', type=int, default=200)
 if __name__ == "__main__":
     args = argparser.parse_args()
     corpus = CorpusManager(args.filename)
-    synthesizer = corpus.get_synth()
+    synthesizer = corpus.synth
 
     decoder = RNN(corpus.alphabet_size, args.hidden_size, corpus.alphabet_size, args.n_layers)
     decoder_optimizer = torch.optim.Adam(decoder.parameters(), lr=args.learning_rate)
