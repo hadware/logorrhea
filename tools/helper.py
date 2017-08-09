@@ -18,9 +18,45 @@ def time_since(since):
     s -= m * 60
     return '%dm %ds' % (m, s)
 
+
+class ConsonantStats:
+
+    def __init__(self):
+        self.durations = []
+        self.pitches = []
+
+    def get_stats(self):
+        return { "duration" : torch.mean(torch.LongTensor(self.durations)),
+                 "pitch" : torch.mean(torch.LongTensor(self.pitches))}
+
+
+class VowelStats:
+    def __init__(self):
+        self.durations = []
+        self.start_pitches = []
+        self.end_pitches = []
+        self.pitch_variations_counts = []
+
+    def get_stats(self):
+        pass
+
+
+class PhonemesStats:
+
+    def __init__(self, phonemes):
+        self.phonemes = phonemes
+        self.consonants = {pho: ConsonantStats() for pho in self.phonemes.CONSONANTS}
+        self.vowels = {pho: VowelStats() for pho in self.phonemes.VOWELS}
+
+    def update(self, phoneme : Phoneme):
+        if phoneme.name in self.phonemes.VOWELS:
+            pass
+        else:
+            pass
+
 class Synthesizer:
 
-    def __init__(self, phonemes_stats : PhonemeStats , alphabet):
+    def __init__(self, phonemes_stats: PhonemeStats, alphabet):
         self.stats = phonemes_stats
         self.alphabet = alphabet
 
@@ -52,9 +88,10 @@ class CorpusManager:
 
     def _build_phonemes_stats(self, phonemized_file):
         logging.info("Building phonemes stats for future synthesizing")
+        stats = PhonemesStats(self.voice.phonems)
         bar = ProgressBar()
         for phoneme in bar(phonemized_file):
-            pass
+            stats.update(phoneme)
 
 
     def random_training_couple(self, chunk_size):
