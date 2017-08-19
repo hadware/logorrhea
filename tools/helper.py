@@ -2,7 +2,7 @@ import logging
 import math
 import random
 import time
-from typing import List
+from typing import List, Dict
 
 import torch
 from bidict import bidict
@@ -19,15 +19,18 @@ def time_since(since):
     return '%dm %ds' % (m, s)
 
 
+def mean_and_stddev(values):
+    return torch.mean(torch.LongTensor(values)), torch.std(torch.LongTensor(values))
+
+
 class ConsonantStats:
 
     def __init__(self):
         self.durations = []
-        self.pitches = []
 
     def get_stats(self):
-        return { "duration" : torch.mean(torch.LongTensor(self.durations)),
-                 "pitch" : torch.mean(torch.LongTensor(self.pitches))}
+        """Returns mean and standard deviation for each statistical distribution"""
+        return {"duration": mean_and_stddev(self.durations)}
 
 
 class VowelStats:
@@ -38,27 +41,44 @@ class VowelStats:
         self.pitch_variations_counts = []
 
     def get_stats(self):
-        pass
+        """Returns mean and standard deviation for each statistical distribution"""
+        return {"duration": mean_and_stddev(self.durations),
+                "start_pitch": mean_and_stddev(self.start_pitches),
+                "end_pitch": mean_and_stddev(self.end_pitches),
+                "pitch_variation_count": mean_and_stddev(self.pitch_variations_counts)}
 
 
 class PhonemesStats:
 
     def __init__(self, phonemes):
         self.phonemes = phonemes
-        self.consonants = {pho: ConsonantStats() for pho in self.phonemes.CONSONANTS}
-        self.vowels = {pho: VowelStats() for pho in self.phonemes.VOWELS}
+        # consonnants also include the pause phoneme since it's the same kind of distribution
+        self.consonants = {pho: ConsonantStats() for pho in self.phonemes.CONSONANTS | "_"} # type:Dict[str,ConsonantStats]
+        self.vowels = {pho: VowelStats() for pho in self.phonemes.VOWELS} # type:Dict[str,VowelStats]
+        self.vowels_stats = None
+        self.consonants_stats = None
 
     def update(self, phoneme : Phoneme):
         if phoneme.name in self.phonemes.VOWELS:
-            pass
-        else:
-            pass
+            pho_stats = self.vowels[phoneme.name]
+            pho_stats.durations.append(phoneme.duration)
+            pho_stats.start_pitches.append(phoneme.pitch_modifiers[0][1]) # first
+            pho_stats.end_pitches.append(phoneme.pitch_modifiers[-1][1]) # last
+            pho_stats.pitch_variations_counts.append(len(phoneme.pitch_modifiers))
+        else: # it's a consonant
+            pho_stats = self.consonants[phoneme.name]
+            pho_stats.durations.append(phoneme.duration)
+
+    def aggregate_stats(self):
+        self.consonants_stats = {pho: pho_stats.get_stats() for pho, pho_stats in self.consonants.items()}
+        self.vowels_stats = {pho: pho_stats.get_stats() for pho, pho_stats in self.vowels.items()}
 
 class Synthesizer:
 
-    def __init__(self, phonemes_stats: PhonemeStats, alphabet):
+    def __init__(self, phonemes_stats : PhonemesStats, alphabet, voice : Voice):
         self.stats = phonemes_stats
         self.alphabet = alphabet
+        self.voice = voice
 
     def to_tensor(self, phonemes_list : List[str]):
         tensor = torch.zeros(len(phonemes_list)).long()
@@ -66,7 +86,7 @@ class Synthesizer:
             tensor[i] = self.alphabet[pho]
         return Variable(tensor)
 
-    def synthesize(self, phonemes_list : List[str]):
+    def synthesize(self, phonemes_list : List[str]) -> bytes:
         """converts a list of phonemes (only their names) to a wav file"""
         pass
 
@@ -81,8 +101,7 @@ class CorpusManager:
         with open(filepath) as corpus_file:
             for line in corpus_file:
                 phonemized_file += self.voice.to_phonemes(line.strip())
-        self._build_phonemes_stats(phonemized_file)
-        self.synth = Synthesizer(self._build_phonemes_stats(phonemized_file), alphabet)
+        self.synth = Synthesizer(self._build_phonemes_stats(phonemized_file), self.alphabet, self.voice)
 
         self.phonemes_list = [phoneme.name for phoneme in phonemized_file]
 
@@ -92,7 +111,8 @@ class CorpusManager:
         bar = ProgressBar()
         for phoneme in bar(phonemized_file):
             stats.update(phoneme)
-
+        stats.aggregate_stats()
+        return stats
 
     def random_training_couple(self, chunk_size):
         start_index = random.randint(0, len(self.phonemes_list) - chunk_size)
