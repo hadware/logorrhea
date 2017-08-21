@@ -9,7 +9,7 @@ from bidict import bidict
 from progressbar import ProgressBar
 from torch.autograd import Variable
 from voxpopuli import Voice
-from voxpopuli.phonemes import Phoneme
+from voxpopuli.phonemes import Phoneme, PhonemeList
 
 
 def time_since(since):
@@ -20,7 +20,7 @@ def time_since(since):
 
 
 def mean_and_stddev(values):
-    return torch.mean(torch.LongTensor(values)), torch.std(torch.LongTensor(values))
+    return torch.mean(torch.FloatTensor(values)), torch.std(torch.FloatTensor(values))
 
 
 class ConsonantStats:
@@ -38,14 +38,12 @@ class VowelStats:
         self.durations = []
         self.start_pitches = []
         self.end_pitches = []
-        self.pitch_variations_counts = []
 
     def get_stats(self):
         """Returns mean and standard deviation for each statistical distribution"""
         return {"duration": mean_and_stddev(self.durations),
                 "start_pitch": mean_and_stddev(self.start_pitches),
-                "end_pitch": mean_and_stddev(self.end_pitches),
-                "pitch_variation_count": mean_and_stddev(self.pitch_variations_counts)}
+                "end_pitch": mean_and_stddev(self.end_pitches)}
 
 
 class PhonemesStats:
@@ -64,7 +62,6 @@ class PhonemesStats:
             pho_stats.durations.append(phoneme.duration)
             pho_stats.start_pitches.append(phoneme.pitch_modifiers[0][1]) # first
             pho_stats.end_pitches.append(phoneme.pitch_modifiers[-1][1]) # last
-            pho_stats.pitch_variations_counts.append(len(phoneme.pitch_modifiers))
         else: # it's a consonant
             pho_stats = self.consonants[phoneme.name]
             pho_stats.durations.append(phoneme.duration)
@@ -72,6 +69,7 @@ class PhonemesStats:
     def aggregate_stats(self):
         self.consonants_stats = {pho: pho_stats.get_stats() for pho, pho_stats in self.consonants.items()}
         self.vowels_stats = {pho: pho_stats.get_stats() for pho, pho_stats in self.vowels.items()}
+        
 
 class Synthesizer:
 
@@ -86,9 +84,25 @@ class Synthesizer:
             tensor[i] = self.alphabet[pho]
         return Variable(tensor)
 
+    def gen_vowel_pitches(self, pho : str):
+        start_pitch = torch.normal(*self.stats.vowels_stats[pho]["start_pitch"])[0]
+        end_pitch = torch.normal(*self.stats.vowels_stats[pho]["end_pitch"])[0]
+        return [(0, start_pitch), (80, end_pitch), (100, end_pitch)]
+
     def synthesize(self, phonemes_list : List[str]) -> bytes:
         """converts a list of phonemes (only their names) to a wav file"""
-        pass
+        pho_list = PhonemeList([])
+        for pho in phonemes_list:
+            if pho in self.voice.phonems.VOWELS:
+                new_phoneme = Phoneme(name=pho,
+                                      duration=int(torch.normal(*self.stats.consonants_stats[pho]["duration"])[0]),
+                                      pitch_mods=self.gen_vowel_pitches(pho))
+            else: #it's a consonant
+                new_phoneme = Phoneme(name=pho,
+                                      duration=int(torch.normal(*self.stats.consonants_stats[pho]["duration"])[0]),
+                                      pitch_mods=[])
+            pho_list.append(new_phoneme)
+        return self.voice.to_audio(pho_list)
 
 
 class CorpusManager:

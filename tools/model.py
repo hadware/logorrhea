@@ -54,11 +54,11 @@ class Model:
     def generate(self, prime_str : List[str], predict_len=100, temperature=0.8):
         hidden = self.decoder.init_hidden()
         prime_input = self.synth.to_tensor(prime_str)
-        predicted = prime_str
+        predicted = [prime_str]
 
         # Use priming string to "build up" hidden state
         for p in range(len(prime_str) - 1):
-            _, hidden = decoder(prime_input[p], hidden)
+            _, hidden = self.decoder(prime_input[p], hidden)
 
         inp = prime_input[-1]
 
