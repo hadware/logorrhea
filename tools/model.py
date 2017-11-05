@@ -37,19 +37,19 @@ class Model:
         self.synth = synthesizer
         self.model_save_filename = None # type:str
 
-    def train(self, input_tensor : torch.LongTensor, target_tensor : torch.LongTensor):
+    def train(self, input_tensor : Variable, target_tensor : Variable):
         hidden = self.decoder.init_hidden()
         self.decoder.zero_grad()
         loss = 0
 
-        for c in range(input_tensor):
+        for c in range(len(input_tensor)):
             output, hidden = self.decoder(input_tensor[c], hidden)
             loss += self.crit(output, target_tensor[c])
 
         loss.backward()
         self.optim.step()
 
-        return loss.data[0] / args.chunk_len
+        return loss.data[0] / len(input_tensor)
 
     def generate(self, prime_str : List[str], predict_len=100, temperature=0.8):
         hidden = self.decoder.init_hidden()
