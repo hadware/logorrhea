@@ -1,4 +1,5 @@
 import argparse
+import logging
 
 import time
 import torch
@@ -17,6 +18,8 @@ argparser.add_argument('--chunk_len', type=int, default=200)
 
 
 if __name__ == "__main__":
+    logging.getLogger().setLevel(logging.DEBUG)
+
     args = argparser.parse_args()
     corpus = CorpusManager(args.filename)
     synthesizer = corpus.synth

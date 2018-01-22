@@ -1,4 +1,3 @@
-# https://github.com/spro/practical-pytorch
 from typing import List
 import torch
 import torch.nn as nn
@@ -6,6 +5,7 @@ from torch.autograd import Variable
 from .helper import Synthesizer
 import pickle
 import os
+
 
 class RNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, n_layers=1):
@@ -28,6 +28,7 @@ class RNN(nn.Module):
     def init_hidden(self):
         return Variable(torch.zeros(self.n_layers, 1, self.hidden_size))
 
+
 class Model:
 
     def __init__(self, rnn_module : nn.Module, optimizer, criterion, synthesizer : Synthesizer):
@@ -37,7 +38,7 @@ class Model:
         self.synth = synthesizer
         self.model_save_filename = None # type:str
 
-    def train(self, input_tensor : Variable, target_tensor : Variable):
+    def train(self, input_tensor: Variable, target_tensor: Variable):
         hidden = self.decoder.init_hidden()
         self.decoder.zero_grad()
         loss = 0

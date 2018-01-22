@@ -3,6 +3,7 @@ import math
 import random
 import time
 from typing import List, Dict
+import subprocess
 
 import torch
 from bidict import bidict
@@ -20,8 +21,10 @@ def time_since(since):
 
 
 def mean_and_stddev(values):
-    return torch.mean(torch.FloatTensor(values)), torch.std(torch.FloatTensor(values))
-
+    try:
+        return torch.mean(torch.FloatTensor(values)), torch.std(torch.FloatTensor(values))
+    except RuntimeError:
+        return None, None
 
 class ConsonantStats:
 
@@ -51,20 +54,26 @@ class PhonemesStats:
     def __init__(self, phonemes):
         self.phonemes = phonemes
         # consonnants also include the pause phoneme since it's the same kind of distribution
-        self.consonants = {pho: ConsonantStats() for pho in self.phonemes.CONSONANTS | "_"} # type:Dict[str,ConsonantStats]
+        self.consonants = {pho: ConsonantStats() for pho in self.phonemes.CONSONANTS | {"_"}} # type:Dict[str,ConsonantStats]
         self.vowels = {pho: VowelStats() for pho in self.phonemes.VOWELS} # type:Dict[str,VowelStats]
         self.vowels_stats = None
         self.consonants_stats = None
 
     def update(self, phoneme : Phoneme):
         if phoneme.name in self.phonemes.VOWELS:
-            pho_stats = self.vowels[phoneme.name]
-            pho_stats.durations.append(phoneme.duration)
-            pho_stats.start_pitches.append(phoneme.pitch_modifiers[0][1]) # first
-            pho_stats.end_pitches.append(phoneme.pitch_modifiers[-1][1]) # last
+            try:
+                pho_stats = self.vowels[phoneme.name]
+                pho_stats.durations.append(phoneme.duration)
+                pho_stats.start_pitches.append(phoneme.pitch_modifiers[0][1]) # first
+                pho_stats.end_pitches.append(phoneme.pitch_modifiers[-1][1]) # last
+            except KeyError:
+                pass
         else: # it's a consonant
-            pho_stats = self.consonants[phoneme.name]
-            pho_stats.durations.append(phoneme.duration)
+            try:
+                pho_stats = self.consonants[phoneme.name]
+                pho_stats.durations.append(phoneme.duration)
+            except KeyError:
+                pass
 
     def aggregate_stats(self):
         self.consonants_stats = {pho: pho_stats.get_stats() for pho, pho_stats in self.consonants.items()}
@@ -109,17 +118,16 @@ class CorpusManager:
 
     def __init__(self, filepath: str, lang="fr"):
         self.voice = Voice(lang=lang)
-        self.alphabet = bidict({pho : i for i, pho in enumerate(self.voice.phonems | "_")})
+        self.alphabet = bidict({pho : i for i, pho in enumerate(self.voice.phonems._all | {"_"})})
         self.alphabet_size = len(self.alphabet)
-        phonemized_file = [] # type: List[Phoneme]
+        logging.info("Loading the input file")
         with open(filepath) as corpus_file:
-            for line in corpus_file:
-                phonemized_file += self.voice.to_phonemes(line.strip())
+            phonemized_file = PhonemeList(corpus_file.read())
         self.synth = Synthesizer(self._build_phonemes_stats(phonemized_file), self.alphabet, self.voice)
 
         self.phonemes_list = [phoneme.name for phoneme in phonemized_file]
 
-    def _build_phonemes_stats(self, phonemized_file):
+    def _build_phonemes_stats(self, phonemized_file: PhonemeList):
         logging.info("Building phonemes stats for future synthesizing")
         stats = PhonemesStats(self.voice.phonems)
         bar = ProgressBar()

@@ -20,6 +20,7 @@ args = argparser.parse_args()
 
 file, file_len = read_file(args.filename)
 
+
 def random_training_set(chunk_len):
     start_index = random.randint(0, file_len - chunk_len)
     end_index = start_index + chunk_len + 1
@@ -28,6 +29,7 @@ def random_training_set(chunk_len):
     target = char_tensor(chunk[1:])
     return inp, target
 
+
 decoder = RNN(n_characters, args.hidden_size, n_characters, args.n_layers)
 decoder_optimizer = torch.optim.Adam(decoder.parameters(), lr=args.learning_rate)
 criterion = nn.CrossEntropyLoss()
@@ -35,6 +37,7 @@ criterion = nn.CrossEntropyLoss()
 start = time.time()
 all_losses = []
 loss_avg = 0
+
 
 def train(inp, target):
     hidden = decoder.init_hidden()
